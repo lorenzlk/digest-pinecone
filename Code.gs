@@ -20,7 +20,7 @@ function isDailyDigest(data) {
   }
   
   return data.participantEmails.includes('logan.lorenz@offlinestudio.com')
-      && data.subject.startsWith('Mula Daily Digest -');
+      && data.subject.includes('Mula Daily Digest');
 }
 
 /**
@@ -57,11 +57,26 @@ function processMulaDigest() {
   const day = String(since.getDate()).padStart(2, '0');
   const dateStr = `${year}/${month}/${day}`;
   
-  const query = `subject:"Mula Daily Digest -" after:${dateStr}`;
+  const query = `subject:"Mula Daily Digest" after:${dateStr}`;
   Logger.log(`Searching Gmail with query: ${query}`);
+  Logger.log(`Last run timestamp: ${lastRun}, since date: ${since}`);
   
   const threads = GmailApp.search(query);
   Logger.log(`Found ${threads.length} threads to process`);
+  
+  // If no threads found, try a broader search for debugging
+  if (threads.length === 0) {
+    Logger.log('No threads found with date filter, trying broader search...');
+    const allDigestThreads = GmailApp.search('subject:"Mula Daily Digest -"');
+    Logger.log(`Found ${allDigestThreads.length} total digest threads (ignoring date filter)`);
+    
+    if (allDigestThreads.length > 0) {
+      const recentThread = allDigestThreads[0];
+      const recentDate = recentThread.getLastMessageDate();
+      Logger.log(`Most recent digest thread date: ${recentDate}`);
+      Logger.log(`Search date cutoff was: ${since}`);
+    }
+  }
 
   // Discover Pinecone host if needed
   if (!indexHost) {
@@ -504,12 +519,34 @@ function testConfiguration() {
  */
 function testSingleThread() {
   try {
+    Logger.log('=== TESTING SINGLE THREAD ===');
+    
+    // First, check if there are ANY emails with "Mula" in the subject
+    const broadSearch = GmailApp.search('subject:Mula', 0, 5);
+    Logger.log(`Found ${broadSearch.length} emails with "Mula" in subject`);
+    
     // Search for the most recent daily digest
     const query = 'subject:"Mula Daily Digest -"';
+    Logger.log(`Searching with query: ${query}`);
     const threads = GmailApp.search(query, 0, 1);
     
     if (threads.length === 0) {
       Logger.log('No Mula Daily Digest threads found');
+      Logger.log('Trying alternative searches...');
+      
+      // Try variations
+      const alt1 = GmailApp.search('subject:"Mula Daily Digest"', 0, 5);
+      Logger.log(`Alternative search "Mula Daily Digest": ${alt1.length} results`);
+      
+      const alt2 = GmailApp.search('subject:"Daily Digest"', 0, 5);
+      Logger.log(`Alternative search "Daily Digest": ${alt2.length} results`);
+      
+      if (broadSearch.length > 0) {
+        Logger.log('Using first email with "Mula" in subject for testing...');
+        const testThread = broadSearch[0];
+        const testSubject = testThread.getFirstMessageSubject();
+        Logger.log(`Test subject: "${testSubject}"`);
+      }
       return;
     }
     
