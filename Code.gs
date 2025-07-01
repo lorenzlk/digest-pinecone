@@ -20,7 +20,7 @@ function isDailyDigest(data) {
   }
   
   return data.participantEmails.includes('logan.lorenz@offlinestudio.com')
-      && data.subject.includes('Mula Daily Digest');
+      && data.subject.startsWith('Mula Daily Digest -');
 }
 
 /**
@@ -57,7 +57,7 @@ function processMulaDigest() {
   const day = String(since.getDate()).padStart(2, '0');
   const dateStr = `${year}/${month}/${day}`;
   
-  const query = `subject:"Mula Daily Digest" after:${dateStr}`;
+  const query = `subject:"Mula Daily Digest -" after:${dateStr}`;
   Logger.log(`Searching Gmail with query: ${query}`);
   Logger.log(`Last run timestamp: ${lastRun}, since date: ${since}`);
   
@@ -514,6 +514,42 @@ function testConfiguration() {
 }
 
 /**
+ * Quick test to see if we can find any Mula Daily Digest emails at all
+ */
+function testFindEmails() {
+  try {
+    Logger.log('=== TESTING EMAIL SEARCH ===');
+    
+    // Test the exact search query without date filter
+    const exactQuery = 'subject:"Mula Daily Digest -"';
+    Logger.log(`Searching with: ${exactQuery}`);
+    const exactResults = GmailApp.search(exactQuery, 0, 5);
+    Logger.log(`Found ${exactResults.length} emails with exact query`);
+    
+    if (exactResults.length > 0) {
+      const firstThread = exactResults[0];
+      const subject = firstThread.getFirstMessageSubject();
+      const date = firstThread.getLastMessageDate();
+      Logger.log(`First result: "${subject}"`);
+      Logger.log(`Date: ${date}`);
+      Logger.log(`Thread ID: ${firstThread.getId()}`);
+      
+      // Test if this email matches our criteria
+      const messages = firstThread.getMessages();
+      const data = extractThreadData(messages, firstThread.getId());
+      Logger.log(`Extracted data - Subject: "${data.subject}"`);
+      Logger.log(`Participant emails: ${data.participantEmails.join(', ')}`);
+      Logger.log(`Is daily digest: ${isDailyDigest(data)}`);
+    } else {
+      Logger.log('No emails found with exact query');
+    }
+    
+  } catch (error) {
+    Logger.log(`Error in testFindEmails: ${error.message}`);
+  }
+}
+
+/**
  * Test function to process a single email thread manually
  * Use this to debug issues with a specific thread
  */
@@ -535,8 +571,8 @@ function testSingleThread() {
       Logger.log('Trying alternative searches...');
       
       // Try variations
-      const alt1 = GmailApp.search('subject:"Mula Daily Digest"', 0, 5);
-      Logger.log(`Alternative search "Mula Daily Digest": ${alt1.length} results`);
+      const alt1 = GmailApp.search('subject:"Mula Daily Digest -"', 0, 5);
+      Logger.log(`Alternative search "Mula Daily Digest -": ${alt1.length} results`);
       
       const alt2 = GmailApp.search('subject:"Daily Digest"', 0, 5);
       Logger.log(`Alternative search "Daily Digest": ${alt2.length} results`);
